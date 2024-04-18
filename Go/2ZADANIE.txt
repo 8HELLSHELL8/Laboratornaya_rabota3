@@ -1,0 +1,334 @@
+ package main
+
+import (
+	"fmt"
+	"math"
+	"math/rand"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// Sieve of Eratosthenes function
+func sieve() {
+	fmt.Print("Input amount of prime number: ")
+	var n int
+	fmt.Scanln(&n)
+	prostchisla := make([]int, n+1)
+
+	for i := range prostchisla {
+		prostchisla[i] = i
+	}
+
+	for p := 2; p <= n; p++ {
+		if prostchisla[p] != 0 {
+			for j := p * p; j <= n; j += p {
+				prostchisla[j] = 0
+			}
+		}
+	}
+
+	lineCount := 0
+	for _, al := range prostchisla {
+		if al != 0 {
+			if lineCount == 10 {
+				fmt.Println()
+				lineCount = 0
+			}
+			fmt.Printf("%d ", al)
+			lineCount++
+		}
+	}
+}
+
+// Modular exponentiation function
+func mod(number, power, n uint64) uint64 {
+	res := uint64(1)
+	for power > 0 {
+		if power%2 != 0 {
+			res = (res * number) % n
+		}
+		number = (number * number) % n
+		power /= 2
+	}
+	return res
+}
+
+// Function to fill a vector with prime numbers from a file (using a pre-existing table)
+func fillPrimesFromFile(filename string) ([]int, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var primes []int
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "@" {
+			break
+		}
+		primeStr := strings.TrimSpace(line)
+		prime, err := strconv.Atoi(primeStr)
+		if err != nil {
+			return nil, err
+		}
+		primes = append(primes, prime)
+	}
+
+	return primes, scanner.Err()
+}
+
+// Miller-Rabin primality test
+func testMiller(t, N int, q setInt, K *int) bool {
+	countT := 0
+	countF := 0
+	for j := 0; j < 50; j++ {
+		aj := make([]int, t)
+
+		// Generate random numbers
+		for i := 0; i < t; i++ {
+			rand1 := rand.Intn(N)
+			if rand1 == 0 {
+				rand1 = 2 + 1
+			}
+			aj[i] = rand1
+		}
+
+		isComposite := false
+
+		for _, aj1 := range aj {
+			if mod(uint64(aj1), uint64(N-1), uint64(N)) != 1 {
+				isComposite = true
+				break
+			}
+		}
+
+		if isComposite {
+			countF++
+			continue
+		}
+
+		for _, aj1 := range aj {
+			for qi := range q {
+				if mod(uint64(aj1), uint64((N-1)/qi), uint64(N)) != 1 {
+					isComposite = true
+					continue
+				}
+			}
+		}
+
+		if isComposite {
+			countF++
+			continue
+		}
+
+		countT++
+	}
+
+	if countT > countF {
+		return true
+	}
+
+	*K++
+	return false
+}
+
+// Poklington test for primality
+func testPoklington(t, N int, q setInt, K *int, prostch []int) bool {
+	countT := 0
+	countF := 0
+	for j := 0; j < 100; j++ {
+
+		aj := make([]int, t)
+
+		// Generate random numbers
+		for i := 0; i < t; i++ {
+			rand1 := rand.Intn(N)
+			if rand1 == 0 {
+				continue
+			}
+			aj[i] = rand1
+		}
+
+		isComposite := false
+
+		for _, aj1 := range aj {
+			if mod(uint64(aj1), uint64(N-1), uint64(N)) != 1 {
+				isComposite = true
+				break
+			}
+		}
+
+		if isComposite {
+			countF++
+			continue
+		}
+
+		for _, aj1 := range aj {
+			for qj := range q {
+				if mod(uint64(aj1), uint64((N-1)/qj), uint64(N)) == 1 {
+					isComposite = true
+					break
+				}
+			}
+			if isComposite {
+				break
+			}
+		}
+
+		if isComposite {
+			countF++
+			continue
+		}
+
+		countT++
+	}
+
+	if countT > countF {
+		return true
+	}
+
+	*K++
+	return false
+}
+
+// Miller test-based generation of prime numbers
+func genMiller(size int, prostch []int, pchM, KM *[]int) {
+	similar := make(map[int]struct{})
+	K := 0
+	for countCikl := 0; countCikl != 10; {
+		q := make(setInt)
+		for i := 0; i < 2; i++ {
+			q[rand.Intn(93)] = prostch[rand.Intn(93)]
+		}
+		m := 1
+		for chislo := range q {
+			m *= chislo
+		}
+		n := 2 * m + 1
+		countN1 := countDigits(n)
+
+		if similar[n] != struct{}{} && countN1 != size {
+			continue
+		}
+
+		if testMiller(1, n, q, &K) {
+			*pchM = append(*pchM, n)
+			similar[n] = struct{}{}
+			countCikl++
+			*KM = append(*KM, K)
+			K = 0
+		}
+	}
+}
+
+// Function to count digits in a number
+func countDigits(num int) int {
+	count := 0
+	for num > 0 {
+		count++
+		num /= 10
+	}
+	return count
+}
+
+// Poklington test-based generation of prime numbers
+func genPoklington(size int, prostch []int, pchP, KP *[]int) {
+	similar := make(map[int]struct{})
+	K := 0
+	for countCikl := 0; countCikl != 10; {
+		q := make(setInt)
+		for i := 0; i < 2; i++ {
+			q[rand.Intn(93)] = prostch[rand.Intn(93)]
+		}
+		f := 1
+		for chislo := range q {
+			f *= chislo
+		}
+		r := rand.Intn((3*f)/4)
+		if r%2 != 0 {
+			r++
+		}
+		n := r * f + 1
+		countN1 := countDigits(n)
+
+		if similar[n] == struct{}{} && countN1 != size {
+			continue
+		}
+
+		if testPoklington(1, n, q, &K, prostch) {
+			*KP = append(*KP, K)
+			*pchP = append(*pchP, n)
+			similar[n] = struct{}{}
+			countCikl++
+			K = 0
+		}
+	}
+}
+
+// GOST-based generation of prime numbers
+func genGOST(size int, prostch []int, pchG, KG *[]int) {
+	similar := make(map[int]struct{})
+	K := 0
+	for countCikl := 0; countCikl != 10; {
+		q := prostch[rand.Intn(93)]
+		K = 0
+		for u := 0; true; u += 2 {
+			N := int(math.Ceil(math.Pow(2, float64(size-1))/float64(q)))
+			if N%2 != 0 {
+				N++
+			}
+			p := (N + u) * q + 1
+			if mod(2, uint64(p-1), uint64(p)) == 1 && mod(2, uint64(N+u), uint64(p)) != 1 {
+				countN1 := countDigits(p)
+				if similar[p] != struct{}{} && countN1 != size {
+					continue
+				}
+				*KG = append(*KG, K)
+				*pchG = append(*pchG, p)
+				countCikl++
+				similar[p] = struct{}{}
+				break
+			}
+			K++
+		}
+	}
+}
+
+func main() {
+	rand.Seed(time.Now().UnixNano())
+
+	size := 3 // Prime number size
+	prostch, err := fillPrimesFromFile("chisla.txt")
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
+
+	// Vectors for prime numbers and counters
+	var pchM, pchP, pchG []int
+	var KM, KP, KG []int
+
+	fmt.Println("Test Milera")
+	genMiller(size, prostch, &pchM, &KM)
+	fmt.Printf("Num: %v\n", 1)
+	fmt.Printf(" p : %v\n", pchM)
+	fmt.Printf(" K : %v\n", KM)
+
+	fmt.Println("\nTest Poklingtona")
+	genPoklington(size, prostch, &pchP, &KP)
+	fmt.Printf("Num: %v\n", 1)
+	fmt.Printf(" p : %v\n", pchP)
+	fmt.Printf(" K : %v\n", KP)
+
+	fmt.Println("\nGOST")
+	genGOST(size, prostch, &pchG, &KG)
+	fmt.Printf("Num: %v\n", 1)
+	fmt.Printf(" p : %v\n", pchG)
+	fmt.Printf(" K : %v\n", KG)
+
+	sieve()
+}

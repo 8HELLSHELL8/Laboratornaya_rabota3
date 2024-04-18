@@ -1,0 +1,34 @@
+package main
+
+import (
+	"fmt"
+	"math"
+)
+
+func myFunction(x float64) float64 {
+	if -2.0 < x && x < 2.0 {
+		return 2 * math.Cos(2 * x)
+	} else {
+		return 0.5*math.Abs(x) - 1.5
+	}
+}
+
+func main() {
+	var startPoint, endPoint, step float64
+	fmt.Print("Input x coordinate for starting point: ")
+	fmt.Scanln(&startPoint)
+	fmt.Print("Input x coordinate for ending point: ")
+	fmt.Scanln(&endPoint)
+	fmt.Print("Input step value: ")
+	fmt.Scanln(&step)
+
+	fmt.Printf("%10s%15s\n", "X", "Y")
+	fmt.Println("-----------------------------")
+
+	// Define epsilon for floating-point comparison
+	epsilon := 1e-9
+
+	for i := startPoint; i < endPoint+epsilon; i += step {
+		fmt.Printf("%10.2f      |%15.2f|\n", i, myFunction(i))
+	}
+}
